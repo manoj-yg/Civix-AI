@@ -1,0 +1,11 @@
+{
+  "name": "civix-ai-root",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Civix-AI Road Damage Detection Platform",
+  "scripts": {
+    "dev": "python run_app.py",
+    "start": "python run_app.py",
+    "build": "cd frontend && npm run build"
+  }
+}
