@@ -110,3 +110,24 @@ training/dataset/rddJapanIndiaFiltered/Japan/*
 !training/dataset/rddJapanIndiaFiltered/rdd_JapanIndia.yaml
 training/runs/
 training/wandb/
+# Frontend dependencies
+frontend/node_modules/
+
+# Backend dependencies
+backend/node_modules/
+
+# Environment files
+.env
+frontend/.env
+backend/.env
+
+# Build folders
+frontend/dist/
+backend/dist/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
