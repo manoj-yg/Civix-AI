@@ -105,6 +105,7 @@ lost+found/
 
 # RDD
 temp/*
+!temp/.gitkeep
 training/dataset/rddJapanIndiaFiltered/India/*
 training/dataset/rddJapanIndiaFiltered/Japan/*
 !training/dataset/rddJapanIndiaFiltered/rdd_JapanIndia.yaml
@@ -131,3 +132,4 @@ backend/dist/
 # OS files
 .DS_Store
 Thumbs.db
+node_modules/

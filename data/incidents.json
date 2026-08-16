@@ -1,1 +1,41 @@
-[]
+[
+  {
+    "id": "INC-22765",
+    "timestamp": "2026-08-16 21:40:22",
+    "source": "Image Detection",
+    "damage_types": [
+      "Potholes"
+    ],
+    "latitude": 12.93422078628908,
+    "longitude": 77.49333147146477,
+    "location_desc": "Maruthi Residency, Nagadevanahalli, Bengaluru West City Corporation, Bengaluru (Device High-Accuracy GPS)",
+    "google_maps_url": "https://www.google.com/maps?q=12.93422078628908,77.49333147146477",
+    "status": "Resolved"
+  },
+  {
+    "id": "INC-33580",
+    "timestamp": "2026-08-16 21:27:13",
+    "source": "Image Detection",
+    "damage_types": [
+      "Potholes"
+    ],
+    "latitude": 12.934204661680496,
+    "longitude": 77.49337945539166,
+    "location_desc": "Maruthi Residency, Nagadevanahalli, Bengaluru West City Corporation, Bengaluru (Device High-Accuracy GPS)",
+    "google_maps_url": "https://www.google.com/maps?q=12.934204661680496,77.49337945539166",
+    "status": "Reported"
+  },
+  {
+    "id": "INC-47903",
+    "timestamp": "2026-08-16 21:19:07",
+    "source": "Image Detection",
+    "damage_types": [
+      "Potholes"
+    ],
+    "latitude": 12.934194129119213,
+    "longitude": 77.49337603530208,
+    "location_desc": "Maruthi Residency, Nagadevanahalli, Bengaluru West City Corporation, Bengaluru (Device High-Accuracy GPS)",
+    "google_maps_url": "https://www.google.com/maps?q=12.934194129119213,77.49337603530208",
+    "status": "Resolved"
+  }
+]
