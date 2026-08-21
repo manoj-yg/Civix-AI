@@ -2,19 +2,21 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/common/Button';
-import { Shield, Lock, Mail, UserCheck, Smartphone, CheckCircle2, ArrowRight, Heart } from 'lucide-react';
+import { Shield, Lock, Mail, UserCheck, Smartphone, CheckCircle2, ArrowRight, Heart, AlertCircle } from 'lucide-react';
 
 export const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState('citizen@civix.gov');
-  const [password, setPassword] = useState('citizen123');
-  const [role, setRole] = useState('CITIZEN');
+  const [email, setEmail] = useState('admin@civix.gov');
+  const [password, setPassword] = useState('admin123');
+  const [role, setRole] = useState('ADMIN');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleModeSwitch = (selectedRole) => {
     setRole(selectedRole);
+    setError('');
     if (selectedRole === 'CITIZEN') {
       setEmail('citizen@civix.gov');
       setPassword('citizen123');
@@ -22,56 +24,46 @@ export const Login = () => {
       setEmail('inspector@civix.gov');
       setPassword('inspector123');
     } else {
-      setEmail('engineer@civix.gov');
+      setEmail('admin@civix.gov');
       setPassword('admin123');
     }
   };
 
   const handleCitizenQuickLogin = async () => {
     setLoading(true);
+    setError('');
     try {
-      const mockUser = {
-        email: 'citizen.guest@civix.gov',
-        full_name: 'Public Citizen',
-        role: 'CITIZEN',
-      };
-      localStorage.setItem('civix_token', 'citizen_token_2026');
-      localStorage.setItem('civix_user', JSON.stringify(mockUser));
-      await login({ email: 'citizen.guest@civix.gov', password: 'guest', role: 'CITIZEN' });
-    } catch {
-      // Fallback redirect to citizen portal
+      const user = await login({ email: 'citizen.guest@civix.gov', password: 'guest', role: 'CITIZEN' });
+      navigate('/field');
+    } catch (err) {
+      // Fallback try citizen@civix.gov
+      try {
+        await login({ email: 'citizen@civix.gov', password: 'citizen123', role: 'CITIZEN' });
+        navigate('/field');
+      } catch (fallbackErr) {
+        setError(fallbackErr.message || err.message || 'Instant citizen login failed. Please enter credentials below.');
+      }
     } finally {
       setLoading(false);
-      navigate('/field');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
       const user = await login({ email, password, role });
-      if (user?.role === 'ADMIN' || user?.role === 'ENGINEER' || role === 'ADMIN') {
+      const userRole = (user?.role || role || '').toUpperCase();
+      if (userRole === 'ADMIN' || userRole === 'ENGINEER') {
         navigate('/admin');
       } else {
         navigate('/field');
       }
     } catch (err) {
-      // Direct mock session fallback for immediate smooth testing
-      const mockUser = {
-        email,
-        full_name: role === 'CITIZEN' ? 'Public Citizen' : role === 'INSPECTOR' ? 'Field Inspector' : 'Municipal Engineer',
-        role,
-      };
-      localStorage.setItem('civix_token', 'mock_jwt_token_2026');
-      localStorage.setItem('civix_user', JSON.stringify(mockUser));
-
-      if (role === 'ADMIN' || role === 'ENGINEER') {
-        navigate('/admin');
-      } else {
-        navigate('/field');
-      }
+      console.error('Login submission error:', err);
+      setError(err.message || 'Invalid email or password. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -120,6 +112,13 @@ export const Login = () => {
             </span>
           </div>
 
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-xs font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{error}</span>
+            </div>
+          )}
+
           {/* Role Switcher */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
@@ -128,14 +127,14 @@ export const Login = () => {
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
-                onClick={() => handleModeSwitch('CITIZEN')}
+                onClick={() => handleModeSwitch('ADMIN')}
                 className={`py-2 px-2 text-[11px] font-bold rounded-lg border transition-all ${
-                  role === 'CITIZEN'
-                    ? 'bg-blue-600 text-white border-blue-600'
+                  role === 'ADMIN'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                     : 'bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                Citizen
+                Admin / Eng.
               </button>
 
               <button
@@ -143,7 +142,7 @@ export const Login = () => {
                 onClick={() => handleModeSwitch('INSPECTOR')}
                 className={`py-2 px-2 text-[11px] font-bold rounded-lg border transition-all ${
                   role === 'INSPECTOR'
-                    ? 'bg-blue-600 text-white border-blue-600'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                     : 'bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                 }`}
               >
@@ -152,14 +151,14 @@ export const Login = () => {
 
               <button
                 type="button"
-                onClick={() => handleModeSwitch('ADMIN')}
+                onClick={() => handleModeSwitch('CITIZEN')}
                 className={`py-2 px-2 text-[11px] font-bold rounded-lg border transition-all ${
-                  role === 'ADMIN'
-                    ? 'bg-blue-600 text-white border-blue-600'
+                  role === 'CITIZEN'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                     : 'bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                Admin / Eng.
+                Citizen
               </button>
             </div>
           </div>
@@ -217,3 +216,4 @@ export const Login = () => {
     </div>
   );
 };
+

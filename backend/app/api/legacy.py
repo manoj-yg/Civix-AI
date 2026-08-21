@@ -196,6 +196,67 @@ async def detect_image(
             location_desc=loc_desc,
             source_type="Image Detection"
         )
+
+        # Synchronize live report to PostgreSQL / SQLite relational database
+        try:
+            from app.db.session import SessionLocal
+            from app.models.models import (
+                Inspection as DBInspection,
+                Detection as DBDetection,
+                SeverityAssessment as DBSeverity,
+                InspectionStatusEnum,
+                SeverityLevelEnum,
+                AssetTypeEnum
+            )
+
+            with SessionLocal() as db_session:
+                sev_score = 50.0
+                if isinstance(severity, dict):
+                    sev_score = float(severity.get("score", 50.0))
+                elif isinstance(severity, (int, float)):
+                    sev_score = float(severity)
+
+                if sev_score >= 80 or (isinstance(severity, dict) and str(severity.get("level")).upper() == "CRITICAL"):
+                    sev_enum = SeverityLevelEnum.CRITICAL
+                elif sev_score >= 60 or (isinstance(severity, dict) and str(severity.get("level")).upper() == "HIGH"):
+                    sev_enum = SeverityLevelEnum.HIGH
+                elif sev_score >= 40 or (isinstance(severity, dict) and str(severity.get("level")).upper() == "MEDIUM"):
+                    sev_enum = SeverityLevelEnum.MEDIUM
+                else:
+                    sev_enum = SeverityLevelEnum.LOW
+
+                db_ins = DBInspection(
+                    latitude=final_lat,
+                    longitude=final_lon,
+                    asset_type=AssetTypeEnum.ROAD,
+                    status=InspectionStatusEnum.PENDING,
+                    ai_status=InspectionStatusEnum.COMPLETED,
+                    work_notes=loc_desc
+                )
+                db_session.add(db_ins)
+                db_session.flush()
+
+                db_sev = DBSeverity(
+                    inspection_id=db_ins.id,
+                    overall_score=sev_score,
+                    severity_level=sev_enum,
+                    details=severity if isinstance(severity, dict) else {"score": sev_score}
+                )
+                db_session.add(db_sev)
+
+                for d in raw_detections:
+                    det = DBDetection(
+                        inspection_id=db_ins.id,
+                        class_name=d.get("class_name", "Potholes"),
+                        confidence=float(d.get("confidence", 0.85)),
+                        bbox=d.get("bbox", [0, 0, 0, 0]),
+                        area_sq_m=float(d.get("area_sq_m", 1.0)) if d.get("area_sq_m") else None
+                    )
+                    db_session.add(det)
+
+                db_session.commit()
+        except Exception as db_err:
+            logger.warning(f"Live database sync warning: {db_err}")
         
         if send_email_alert or cfg.get("enable_email"):
             if cfg.get("sender_email") and cfg.get("sender_password") and cfg.get("recipient_email"):

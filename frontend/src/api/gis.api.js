@@ -24,4 +24,9 @@ export const gisApi = {
   getAllGISDefects: async (params = {}) => {
     return await apiClient.get('/gis/defects', { params });
   },
+
+  getSummaryStats: async () => {
+    return await apiClient.get('/gis/summary-stats');
+  },
 };
+

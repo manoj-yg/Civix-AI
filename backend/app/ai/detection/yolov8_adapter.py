@@ -24,38 +24,104 @@ def download_file(url: str, dest_path: Path, expected_size: Optional[int] = None
     urllib.request.urlretrieve(url, str(dest_path))
 
 class YOLOv8Adapter(DetectionModel):
+    """
+    Universal YOLO Detection Adapter supporting YOLOv26, YOLOv11, and YOLOv8 models.
+    Supports dynamic class introspection from Ultralytics model weights.
+    """
     def __init__(self, model_path: Optional[str] = None):
-        self.model_name = "YOLOv8_Small_RDD"
-        self.model_version = "1.0.0"
-        self.model_path = Path(model_path or settings.YOLO_DEFAULT_MODEL_PATH)
+        self.model_path = Path(model_path) if model_path else settings.get_active_yolo_model_path()
+        self.model_name = settings.get_active_yolo_model_name()
+        self.model_version = self._infer_version()
         self.model = None
         self._is_loaded = False
+
+    def _infer_version(self) -> str:
+        stem = self.model_path.stem.lower()
+        if "26" in stem:
+            return "26.0.0"
+        elif "11" in stem:
+            return "11.0.0"
+        elif "v8" in stem or "rdd" in stem:
+            return "1.0.0"
+        return "2.0.0"
+
+    def _resolve_model_metadata(self):
+        stem = self.model_path.stem.lower()
+        if "26" in stem:
+            self.model_name = "YOLOv26_Pothole_Detector"
+            self.model_version = "26.0.0"
+        elif "11" in stem:
+            self.model_name = "YOLOv11_Pothole_Detector"
+            self.model_version = "11.0.0"
+        elif "best" in stem:
+            self.model_name = "YOLO_Pothole_Detector_Best"
+            self.model_version = "1.0.0"
+        elif "rdd" in stem or "v8" in stem:
+            self.model_name = "YOLOv8_Small_RDD"
+            self.model_version = "1.0.0"
+        else:
+            self.model_name = f"YOLO_{self.model_path.stem}"
+            self.model_version = "1.0.0"
 
     def load(self, model_path: Optional[str] = None) -> bool:
         if model_path:
             self.model_path = Path(model_path)
-            
+
+        self._resolve_model_metadata()
+
+        # If designated path doesn't exist, try fallback candidates
         if not self.model_path.exists():
-            logger.info(f"YOLOv8 weights missing at {self.model_path}. Downloading default model...")
+            resolved = settings.get_active_yolo_model_path()
+            if resolved.exists():
+                self.model_path = resolved
+                self._resolve_model_metadata()
+
+        if not self.model_path.exists():
+            logger.info(f"YOLO weights missing at {self.model_path}. Downloading default model...")
             self.model_path.parent.mkdir(parents=True, exist_ok=True)
             try:
                 download_file(DEFAULT_MODEL_URL, self.model_path, expected_size=89569358)
             except Exception as e:
-                logger.warning(f"Unable to download default YOLOv8 weights: {e}")
+                logger.warning(f"Unable to download default YOLO weights: {e}")
 
         try:
             from ultralytics import YOLO
             if self.model_path.exists():
                 self.model = YOLO(str(self.model_path))
                 self._is_loaded = True
-                logger.info(f"Successfully loaded YOLOv8 model from {self.model_path}")
+                logger.info(f"Successfully loaded YOLO model '{self.model_name}' (v{self.model_version}) from {self.model_path}")
                 return True
         except Exception as e:
-            logger.error(f"Failed to load YOLOv8 model via ultralytics: {e}")
+            logger.error(f"Failed to load YOLO model via ultralytics: {e}")
 
         # Intelligent Fallback Active Mode
         self._is_loaded = True
         return True
+
+    def _resolve_class_name(self, cls_id: int) -> str:
+        """
+        Dynamically extracts class name from the model's names dictionary and normalizes it.
+        """
+        raw_name = None
+        if self.model is not None and hasattr(self.model, "names") and isinstance(self.model.names, dict):
+            raw_name = self.model.names.get(cls_id)
+
+        if raw_name is None:
+            if cls_id < len(CLASSES):
+                raw_name = CLASSES[cls_id]
+            else:
+                raw_name = f"Class_{cls_id}"
+
+        norm = str(raw_name).strip()
+        if norm.lower() in ("pothole", "potholes"):
+            return "Potholes"
+        elif norm.lower() in ("longitudinal crack", "longitudinal_crack"):
+            return "Longitudinal Crack"
+        elif norm.lower() in ("transverse crack", "transverse_crack"):
+            return "Transverse Crack"
+        elif norm.lower() in ("alligator crack", "alligator_crack"):
+            return "Alligator Crack"
+        return norm.title()
 
     def _fallback_detect(self, img_np: np.ndarray, confidence: float = 0.45) -> List[Dict[str, Any]]:
         """
@@ -84,7 +150,7 @@ class YOLOv8Adapter(DetectionModel):
             if (box_w * box_h) / frame_area > 0.01:
                 area_sq_m = round(((box_w * box_h) / frame_area) * 2.5, 3)
                 detections.append({
-                    "class_id": 3,
+                    "class_id": 0,
                     "class_name": "Potholes",
                     "confidence": 0.94,
                     "bbox": {
@@ -106,7 +172,7 @@ class YOLOv8Adapter(DetectionModel):
             ymax, xmax = high_edges.max(axis=0)
             area_sq_m = round((((xmax - xmin) * (ymax - ymin)) / frame_area) * 1.8, 3)
             detections.append({
-                "class_id": 2,
+                "class_id": 1,
                 "class_name": "Alligator Crack",
                 "confidence": 0.88,
                 "bbox": {
@@ -146,7 +212,7 @@ class YOLOv8Adapter(DetectionModel):
                     boxes = results[0].boxes
                     for box in boxes:
                         cls_id = int(box.cls[0].item())
-                        cls_name = CLASSES[cls_id] if cls_id < len(CLASSES) else f"Class_{cls_id}"
+                        cls_name = self._resolve_class_name(cls_id)
                         conf = float(box.conf[0].item())
                         xyxy = box.xyxy[0].tolist()
 
@@ -168,7 +234,7 @@ class YOLOv8Adapter(DetectionModel):
                             "area_sq_m": area_sq_m
                         })
             except Exception as e:
-                logger.warning(f"YOLOv8 inference exception: {e}. Executing fallback feature extractor.")
+                logger.warning(f"YOLO inference exception: {e}. Executing fallback feature extractor.")
 
         if len(detections) == 0:
             detections = self._fallback_detect(img_np, confidence=confidence)
@@ -188,3 +254,4 @@ class YOLOv8Adapter(DetectionModel):
         self.model = None
         self._is_loaded = False
         logger.info(f"Unloaded model {self.model_name}")
+

@@ -33,6 +33,12 @@ class SeverityOut(BaseModel):
     class Config:
         from_attributes = True
 
+class InspectionStatusUpdate(BaseModel):
+    status: InspectionStatusEnum
+    assigned_engineer: Optional[str] = None
+    work_notes: Optional[str] = None
+    resolution_notes: Optional[str] = None
+
 class InspectionCreate(BaseModel):
     asset_id: Optional[UUID] = None
     asset_type: Optional[str] = "ROAD"
@@ -54,6 +60,10 @@ class InspectionOut(BaseModel):
     status: InspectionStatusEnum
     ai_status: InspectionStatusEnum
     upvotes_count: Optional[int] = 0
+    assigned_engineer: Optional[str] = None
+    work_notes: Optional[str] = None
+    resolution_notes: Optional[str] = None
+    resolved_at: Optional[datetime] = None
     created_at: datetime
     media_items: List[MediaOut] = []
     detections: List[DetectionOut] = []

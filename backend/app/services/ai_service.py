@@ -6,26 +6,28 @@ from typing import List, Dict, Any, Tuple, Optional
 import numpy as np
 from PIL import Image
 
-from app.core.config import ROOT_DIR
+from app.core.config import ROOT_DIR, settings
 from app.ai.pipelines.unified_pipeline import get_unified_pipeline
 
 logger = logging.getLogger("civix_backend")
 
-MODELS_DIR = ROOT_DIR / "models"
+MODELS_DIR = Path(settings.MODELS_DIR)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 MODEL_URL = "https://github.com/oracl4/RoadDamageDetection/raw/main/models/YOLOv8_Small_RDD.pt"
-MODEL_PATH = MODELS_DIR / "YOLOv8_Small_RDD.pt"
+MODEL_PATH = settings.get_active_yolo_model_path()
 
 CLASSES = [
+    "Potholes",
     "Longitudinal Crack",
     "Transverse Crack",
-    "Alligator Crack",
-    "Potholes"
+    "Alligator Crack"
 ]
 
 DAMAGE_WEIGHTS = {
     "Potholes": 4.0,
+    "Pothole": 4.0,
+    "pothole": 4.0,
     "Alligator Crack": 3.0,
     "Transverse Crack": 2.0,
     "Longitudinal Crack": 1.5

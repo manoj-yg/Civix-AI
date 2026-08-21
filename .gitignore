@@ -103,33 +103,61 @@ Desktop.ini
 # Linux
 lost+found/
 
-# RDD
+# Temporary Files, Local Uploads & Media Storage
+temp/
 temp/*
 !temp/.gitkeep
+backend/temp/
+backend/temp/*
+!backend/temp/.gitkeep
+backend/uploads/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/storage/
+backend/storage/*
+!backend/storage/.gitkeep
+backend/artifacts/
+backend/artifacts/*
+!backend/artifacts/.gitkeep
+backend/cache/
+backend/cache/*
+!backend/cache/.gitkeep
+
+# Local SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+backend/temp/*.db
+temp/*.db
+
+# Training dataset cache
 training/dataset/rddJapanIndiaFiltered/India/*
 training/dataset/rddJapanIndiaFiltered/Japan/*
 !training/dataset/rddJapanIndiaFiltered/rdd_JapanIndia.yaml
 training/runs/
 training/wandb/
-# Frontend dependencies
+
+# Frontend dependencies & build
 frontend/node_modules/
-
-# Backend dependencies
-backend/node_modules/
-
-# Environment files
-.env
-frontend/.env
-backend/.env
-
-# Build folders
 frontend/dist/
+frontend/.env
+
+# Backend dependencies & build
+backend/node_modules/
 backend/dist/
+backend/.env
+backend/.env.*
+!.env.example
 
 # Logs
 *.log
+*.log.*
+logs/
 
 # OS files
 .DS_Store
 Thumbs.db
+Desktop.ini
 node_modules/
+/tests

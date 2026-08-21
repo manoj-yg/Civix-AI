@@ -31,4 +31,9 @@ export const inspectionApi = {
   getInspectionById: async (id) => {
     return await apiClient.get(`/inspections/${id}`);
   },
+
+  updateInspectionStatus: async (id, data) => {
+    return await apiClient.patch(`/inspections/${id}/status`, data);
+  },
 };
+

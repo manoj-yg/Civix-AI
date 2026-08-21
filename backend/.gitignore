@@ -1,0 +1,111 @@
+# ==============================================================================
+# Civix-AI Backend .gitignore
+# ==============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.env
+.env.*
+!.env.example
+.venv
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Backend Temporary Files, Local Uploads & Media Storage
+temp/
+temp/*
+!temp/.gitkeep
+uploads/
+uploads/*
+!uploads/.gitkeep
+storage/
+storage/*
+!storage/.gitkeep
+cache/
+cache/*
+!cache/.gitkeep
+artifacts/
+artifacts/*
+!artifacts/.gitkeep
+
+# SQLite Databases & Local Test Storage
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+temp/*.db
+temp/*.sqlite
+civix_ai.db
+
+# Unit Tests & Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Node.js / Hardhat / Blockchain dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+hardhat.config.local.js
+typechain/
+typechain-types/
+
+# Logs
+*.log
+*.log.*
+logs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE / Editor configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+/tests

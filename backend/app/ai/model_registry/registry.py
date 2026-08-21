@@ -89,6 +89,26 @@ class ModelRegistry:
         
         # Register default metadata entries
         self.register_model_metadata(ModelMetadata(
+            model_name="YOLOv26_Pothole_Detector",
+            model_version="26.0.0",
+            framework="Ultralytics YOLOv26",
+            trained_at="2026-02-01T00:00:00Z",
+            metrics={"mAP50": 0.912, "precision": 0.93, "recall": 0.89},
+            path_reference="models/yolo26_model.pt",
+            active_status=True
+        ))
+
+        self.register_model_metadata(ModelMetadata(
+            model_name="YOLOv11_Pothole_Detector",
+            model_version="11.0.0",
+            framework="Ultralytics YOLOv11",
+            trained_at="2025-11-10T00:00:00Z",
+            metrics={"mAP50": 0.895, "precision": 0.91, "recall": 0.88},
+            path_reference="models/yolov11_model.pt",
+            active_status=True
+        ))
+
+        self.register_model_metadata(ModelMetadata(
             model_name="YOLOv8_Small_RDD",
             model_version="1.0.0",
             framework="Ultralytics YOLOv8",

@@ -61,8 +61,10 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
     # AI Models & Infrastructure Settings
-    MODEL_VERSION: str = "yolov8" # "yolov8" or "v2" / "upgraded" for rollback control
+    MODEL_VERSION: str = "auto" # "auto", "yolov26", "yolov11", "yolov8", "v2"
     MODELS_DIR: str = str(ROOT_DIR / "models")
+    YOLO_V26_MODEL_PATH: str = str(ROOT_DIR / "models" / "yolo26_model.pt")
+    YOLO_V11_MODEL_PATH: str = str(ROOT_DIR / "models" / "yolov11_model.pt")
     YOLO_DEFAULT_MODEL_PATH: str = str(ROOT_DIR / "models" / "YOLOv8_Small_RDD.pt")
     YOLO_UPGRADED_MODEL_PATH: Optional[str] = None
     UNET_MODEL_PATH: Optional[str] = None
@@ -105,4 +107,60 @@ class Settings(BaseSettings):
             return self.DATABASE_URL
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
+    def get_active_yolo_model_path(self) -> Path:
+        """
+        Dynamically resolves the active YOLO model path based on MODEL_VERSION and existing weights.
+        Prioritizes:
+          1. Explicit path in YOLO_UPGRADED_MODEL_PATH
+          2. Version flag: 'yolo26' / 'yolov26' -> yolo26_model.pt
+          3. Version flag: 'yolo11' / 'yolov11' -> yolov11_model.pt or 'yolov11 model.pt'
+          4. Version flag: 'yolov8' -> YOLOv8_Small_RDD.pt
+          5. 'auto' -> finds first existing in: yolo26_model.pt, yolov11_model.pt, best.pt, YOLOv8_Small_RDD.pt
+        """
+        models_dir = Path(self.MODELS_DIR)
+        if self.YOLO_UPGRADED_MODEL_PATH and Path(self.YOLO_UPGRADED_MODEL_PATH).exists():
+            return Path(self.YOLO_UPGRADED_MODEL_PATH)
+
+        mv = (self.MODEL_VERSION or "").lower()
+        if mv in ("yolov26", "yolo26"):
+            p = models_dir / "yolo26_model.pt"
+            if p.exists():
+                return p
+        elif mv in ("yolov11", "yolo11"):
+            for name in ("yolov11_model.pt", "yolov11 model.pt"):
+                p = models_dir / name
+                if p.exists():
+                    return p
+        elif mv in ("yolov8", "rdd"):
+            p = models_dir / "YOLOv8_Small_RDD.pt"
+            if p.exists():
+                return p
+
+        # Auto detection search order
+        candidates = [
+            models_dir / "yolo26_model.pt",
+            models_dir / "yolov11_model.pt",
+            models_dir / "yolov11 model.pt",
+            models_dir / "best.pt",
+            models_dir / "YOLOv8_Small_RDD.pt"
+        ]
+        for c in candidates:
+            if c.exists():
+                return c
+        return Path(self.YOLO_DEFAULT_MODEL_PATH)
+
+    def get_active_yolo_model_name(self) -> str:
+        p = self.get_active_yolo_model_path()
+        stem = p.stem.lower()
+        if "26" in stem:
+            return "YOLOv26_Pothole_Detector"
+        elif "11" in stem:
+            return "YOLOv11_Pothole_Detector"
+        elif "best" in stem:
+            return "YOLO_Pothole_Detector_Best"
+        elif "rdd" in stem or "v8" in stem:
+            return "YOLOv8_Small_RDD"
+        return f"YOLO_{p.stem}"
+
 settings = Settings()
+

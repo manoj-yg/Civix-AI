@@ -35,6 +35,8 @@ class AssetTypeEnum(str, enum.Enum):
 class InspectionStatusEnum(str, enum.Enum):
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
+    IN_PROGRESS = "IN_PROGRESS"
+    WORK_DONE = "WORK_DONE"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     REVIEW_REQUIRED = "REVIEW_REQUIRED"
@@ -112,6 +114,10 @@ class Inspection(Base):
     status = Column(Enum(InspectionStatusEnum), default=InspectionStatusEnum.PENDING, nullable=False)
     ai_status = Column(Enum(InspectionStatusEnum), default=InspectionStatusEnum.PENDING, nullable=False)
     upvotes_count = Column(Integer, default=0, nullable=False)
+    assigned_engineer = Column(String(255), nullable=True)
+    work_notes = Column(Text, nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 

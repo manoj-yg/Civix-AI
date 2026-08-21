@@ -84,12 +84,12 @@ export const Reports = () => {
 
           <div className="pt-3">
             <a
-              href={reportApi.getPDFReportUrl('sample-summary-report')}
+              href={reportApi.getSummaryPDFReportUrl({ severity: severityFilter, asset_type: infraFilter })}
               target="_blank"
               rel="noopener noreferrer"
             >
               <Button size="lg" icon={Download} fullWidth>
-                Generate & Download Engineering PDF Report
+                Generate & Download Municipal Severity PDF Report
               </Button>
             </a>
           </div>

@@ -58,6 +58,17 @@ def get_severity_heatmap(
     heatmap = gis_service.get_gis_heatmap(db)
     return StandardResponse(data=heatmap)
 
+@router.get("/summary-stats", response_model=StandardResponse[Dict[str, Any]])
+def get_gis_summary_stats(
+    db: Session = Depends(get_db),
+    gis_service: GISService = Depends(get_gis_service)
+):
+    """
+    Returns city-wide aggregated damage metrics grouped by severity, infrastructure type, and status.
+    """
+    stats = gis_service.get_summary_stats(db)
+    return StandardResponse(data=stats)
+
 @router.get("/defects", response_model=StandardResponse[GeoJSONFeatureCollection])
 def get_gis_defects(
     db: Session = Depends(get_db),
@@ -68,3 +79,4 @@ def get_gis_defects(
     """
     geojson = gis_service.get_defects_geojson(db)
     return StandardResponse(data=geojson)
+

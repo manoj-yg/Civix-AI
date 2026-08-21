@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.pool import StaticPool
@@ -28,8 +29,12 @@ def init_engine():
         except Exception as e:
             logger.warning(f"PostgreSQL unavailable at {db_url}: {e}. Using SQLite fallback database for local execution.")
 
+    db_dir = settings.ROOT_DIR if hasattr(settings, "ROOT_DIR") else Path(__file__).resolve().parent.parent.parent.parent
+    local_db_path = Path(db_dir) / "temp" / "civix_ai.db"
+    local_db_path.parent.mkdir(parents=True, exist_ok=True)
+
     eng = create_engine(
-        "sqlite:///:memory:",
+        f"sqlite:///{local_db_path}",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool
     )
@@ -65,6 +70,25 @@ engine = init_engine()
 try:
     import app.models.models
     Base.metadata.create_all(bind=engine)
+    
+    # Safe auto-migration for PostgreSQL & SQLite
+    from sqlalchemy import text, inspect
+    inspector = inspect(engine)
+    if "inspections" in inspector.get_table_names():
+        existing_cols = [c["name"] for c in inspector.get_columns("inspections")]
+        for col, col_type in [
+            ("assigned_engineer", "VARCHAR(255)"),
+            ("work_notes", "TEXT"),
+            ("resolution_notes", "TEXT"),
+            ("resolved_at", "TIMESTAMP")
+        ]:
+            if col not in existing_cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text(f"ALTER TABLE inspections ADD COLUMN {col} {col_type};"))
+                        conn.commit()
+                except Exception:
+                    pass
 except Exception as e:
     logger.warning(f"Metadata table creation warning: {e}")
 

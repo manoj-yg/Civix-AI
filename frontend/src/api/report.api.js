@@ -6,6 +6,12 @@ export const reportApi = {
     return `${baseURL}/reports/pdf/${inspectionId}`;
   },
 
+  getSummaryPDFReportUrl: (params = {}) => {
+    const baseURL = apiClient.defaults.baseURL;
+    const query = new URLSearchParams(params).toString();
+    return `${baseURL}/reports/summary/pdf${query ? `?${query}` : ''}`;
+  },
+
   getJSONReport: async (inspectionId) => {
     return await apiClient.get(`/reports/json/${inspectionId}`);
   },
@@ -14,3 +20,4 @@ export const reportApi = {
     return await apiClient.post('/reports/generate', filters);
   },
 };
+

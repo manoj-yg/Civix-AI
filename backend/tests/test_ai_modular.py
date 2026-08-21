@@ -28,14 +28,25 @@ def test_model_registry():
     assert "spalling" in bridge_defects
 
 def test_yolo_adapters():
-    yolo8 = YOLOv8Adapter()
-    assert yolo8.model_name == "YOLOv8_Small_RDD"
+    # Test active YOLO model adapter
+    yolo_active = YOLOv8Adapter()
+    assert "YOLO" in yolo_active.model_name
     
     dummy_img = Image.new("RGB", (300, 300), color=(100, 100, 100))
-    res8 = yolo8.predict(dummy_img)
-    assert "model_name" in res8
-    assert "detections" in res8
-    assert isinstance(res8["inference_time_ms"], float)
+    res = yolo_active.predict(dummy_img)
+    assert "model_name" in res
+    assert "detections" in res
+    assert isinstance(res["inference_time_ms"], float)
+
+    # Test explicit YOLOv26 adapter if weights exist
+    yolo26 = YOLOv8Adapter(model_path="models/yolo26_model.pt")
+    res26 = yolo26.predict(dummy_img)
+    assert res26["model_name"] == "YOLOv26_Pothole_Detector"
+
+    # Test explicit YOLOv11 adapter if weights exist
+    yolo11 = YOLOv8Adapter(model_path="models/yolov11_model.pt")
+    res11 = yolo11.predict(dummy_img)
+    assert res11["model_name"] == "YOLOv11_Pothole_Detector"
 
     generic_yolo = YOLOGenericAdapter(model_name="YOLO_Upgraded", class_names=["pothole", "spalling"])
     res_gen = generic_yolo.predict(dummy_img)

@@ -15,20 +15,21 @@ export const Register = () => {
   const [department, setDepartment] = useState('Roads & Infrastructure');
   const [loading, setLoading] = useState(false);
 
+  const [error, setError] = useState('');
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
-      await register({ full_name: fullName, email, password, role, department });
-      await login({ email, password, role });
-      navigate(role === 'ADMIN' ? '/admin' : '/field');
-    } catch {
-      // Fallback register & login
-      const mockUser = { full_name: fullName, email, role, department };
-      localStorage.setItem('civix_token', 'mock_jwt_token_2026');
-      localStorage.setItem('civix_user', JSON.stringify(mockUser));
-      navigate(role === 'ADMIN' ? '/admin' : '/field');
+      await register({ full_name: fullName, email, password, role });
+      const user = await login({ email, password, role });
+      const userRole = (user?.role || role || '').toUpperCase();
+      navigate(userRole === 'ADMIN' || userRole === 'ENGINEER' ? '/admin' : '/field');
+    } catch (err) {
+      console.error('Registration failed:', err);
+      setError(err.message || 'Registration failed. Email may already be in use.');
     } finally {
       setLoading(false);
     }
@@ -48,6 +49,11 @@ export const Register = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white dark:bg-slate-900 py-8 px-6 shadow-xl rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-xs font-medium">
+              {error}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Full Name</label>

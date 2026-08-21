@@ -24,20 +24,30 @@ def get_current_user(
     payload = decode_access_token(token)
     if not payload or "sub" not in payload:
         raise UnauthorizedException("Invalid token")
+    sub_val = payload["sub"]
+    user = None
     try:
-        user_id = UUID(payload["sub"])
+        user_uuid = UUID(str(sub_val))
+        user = db.query(User).filter(User.id == user_uuid).first()
     except (ValueError, TypeError):
-        user_id = payload["sub"]
+        pass
 
-    user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise NotFoundException("User")
+        user = db.query(User).filter(User.email == str(sub_val).lower()).first()
+
+    if not user:
+        raise UnauthorizedException("User not found or session expired")
     return user
+
+def _serialize_user(user: User) -> UserOut:
+    if hasattr(UserOut, "model_validate"):
+        return UserOut.model_validate(user)
+    return UserOut.from_orm(user)
 
 @router.post("/register", response_model=StandardResponse[UserOut])
 def register(user_in: UserRegister, db: Session = Depends(get_db), auth_service: AuthService = Depends(get_auth_service)):
     user = auth_service.register_user(db, user_in)
-    return StandardResponse(data=UserOut.from_orm(user))
+    return StandardResponse(data=_serialize_user(user))
 
 @router.post("/login", response_model=StandardResponse[Token])
 def login(user_in: UserLogin, db: Session = Depends(get_db), auth_service: AuthService = Depends(get_auth_service)):
@@ -48,10 +58,9 @@ def login(user_in: UserLogin, db: Session = Depends(get_db), auth_service: AuthS
         expires_in=60 * 24 * 7 * 60,
         role=user.role,
         user_id=user.id,
-        user=UserOut.from_orm(user)
+        user=_serialize_user(user)
     ))
-
 
 @router.get("/me", response_model=StandardResponse[UserOut])
 def me(current_user: User = Depends(get_current_user)):
-    return StandardResponse(data=UserOut.from_orm(current_user))
+    return StandardResponse(data=_serialize_user(current_user))

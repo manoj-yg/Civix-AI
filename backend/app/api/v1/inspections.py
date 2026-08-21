@@ -81,14 +81,59 @@ def get_inspection(id: UUID, db: Session = Depends(get_db)):
         raise NotFoundException("Inspection", id)
     return StandardResponse(data=InspectionOut.from_orm(inspection))
 
-@router.get("", response_model=StandardResponse[List[InspectionOut]])
-def list_inspections(
-    skip: int = Query(0),
-    limit: int = Query(50),
+import datetime
+from app.schemas.inspection import InspectionCreate, InspectionOut, MediaOut, InspectionStatusUpdate
+
+@router.patch("/{id}/status", response_model=StandardResponse[InspectionOut])
+def update_inspection_status(
+    id: UUID,
+    payload: InspectionStatusUpdate,
     db: Session = Depends(get_db)
 ):
     repo = InspectionRepository()
-    items = repo.get_multi(db, skip=skip, limit=limit)
+    inspection = repo.get(db, id)
+    if not inspection:
+        raise NotFoundException("Inspection", id)
+    
+    inspection.status = payload.status
+    if payload.assigned_engineer is not None:
+        inspection.assigned_engineer = payload.assigned_engineer
+    if payload.work_notes is not None:
+        inspection.work_notes = payload.work_notes
+    if payload.resolution_notes is not None:
+        inspection.resolution_notes = payload.resolution_notes
+    
+    if payload.status in [InspectionStatusEnum.WORK_DONE, InspectionStatusEnum.COMPLETED]:
+        inspection.resolved_at = datetime.datetime.utcnow()
+    
+    db.commit()
+    db.refresh(inspection)
+    return StandardResponse(data=InspectionOut.from_orm(inspection))
+
+@router.get("", response_model=StandardResponse[List[InspectionOut]])
+def list_inspections(
+    skip: int = Query(0),
+    limit: int = Query(100),
+    asset_type: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Inspection)
+    if asset_type and asset_type.upper() != "ALL":
+        query = query.filter(Inspection.asset_type == asset_type.upper())
+    if status and status.upper() != "ALL":
+        query = query.filter(Inspection.status == status.upper())
+    
+    items = query.order_by(Inspection.created_at.desc()).offset(skip).limit(limit).all()
+
+    # Filter by severity if requested
+    if severity and severity.upper() != "ALL":
+        items = [i for i in items if i.severity_assessment and (
+            (hasattr(i.severity_assessment.severity_level, "value") and i.severity_assessment.severity_level.value == severity.upper()) or
+            str(i.severity_assessment.severity_level) == severity.upper()
+        )]
+
     return StandardResponse(data=[InspectionOut.from_orm(item) for item in items])
 
 @router.post("/{id}/upvote", response_model=StandardResponse[InspectionOut])
@@ -103,4 +148,14 @@ def upvote_inspection(id: UUID, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(inspection)
     return StandardResponse(data=InspectionOut.from_orm(inspection))
+
+@router.get("/media/file/{filename}")
+def serve_media_file(filename: str):
+    from pathlib import Path
+    from app.core.config import settings
+    file_path = Path(settings.STORAGE_DIR) / filename
+    if not file_path.exists():
+        raise NotFoundException("Media file", filename)
+    return FileResponse(path=str(file_path))
+
 

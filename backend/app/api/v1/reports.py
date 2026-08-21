@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
@@ -42,6 +42,28 @@ def generate_json_report(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Report generation error: {e}")
 
+@router.get("/summary/pdf")
+def download_summary_pdf_report(
+    severity: Optional[str] = None,
+    asset_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    report_service: ReportService = Depends(get_report_service)
+):
+    """
+    Generates and downloads a summary engineering inspection PDF report.
+    """
+    try:
+        pdf_bytes = report_service.generate_summary_pdf_bytes(db, severity=severity, asset_type=asset_type)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=BBMP_Civix_Executive_Report.pdf"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation error: {e}")
+
 @router.get("/pdf/{inspection_id}")
 def download_pdf_report(
     inspection_id: str,
@@ -58,10 +80,11 @@ def download_pdf_report(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={
-                "Content-Disposition": f"attachment; filename=CIVIX_Report_{inspection_id[:8]}.pdf"
+                "Content-Disposition": f"attachment; filename=BBMP_Report_{inspection_id[:8]}.pdf"
             }
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF generation error: {e}")
+

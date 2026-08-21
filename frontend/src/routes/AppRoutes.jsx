@@ -36,6 +36,7 @@ import { BlockchainAudit } from '../pages/admin/BlockchainAudit';
 import { FederatedLearning } from '../pages/admin/FederatedLearning';
 import { ModelMonitoring } from '../pages/admin/ModelMonitoring';
 import { Settings } from '../pages/admin/Settings';
+import { BBMPDashboard } from '../pages/admin/BBMPDashboard';
 
 export const AppRoutes = () => {
   return (
@@ -76,6 +77,7 @@ export const AppRoutes = () => {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="bbmp-operations" element={<BBMPDashboard />} />
         <Route path="map" element={<LiveMap />} />
         <Route path="inspections" element={<Inspections />} />
         <Route path="inspections/:id" element={<InspectionDetails />} />

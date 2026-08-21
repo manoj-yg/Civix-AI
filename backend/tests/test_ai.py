@@ -30,7 +30,7 @@ def test_health_check_model_loaded(client):
     data = resp.json()
     assert data["status"] == "ok"
     assert data["model_loaded"] is True
-    assert "YOLOv8_Small_RDD.pt" in data["model_path"]
+    assert any(m in data["model_path"] for m in ["yolo26", "yolov11", "YOLOv8", "best.pt"])
 
 def test_detect_image_endpoint(client):
     """Verify /api/detect/image endpoint handles uploaded image and returns detections and severity."""
