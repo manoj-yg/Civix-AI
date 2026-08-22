@@ -16,4 +16,9 @@ export const federatedApi = {
   getModelMetadata: async () => {
     return await apiClient.get('/federated/model');
   },
+
+  getClients: async () => {
+    return await apiClient.get('/federated/clients');
+  },
 };
+

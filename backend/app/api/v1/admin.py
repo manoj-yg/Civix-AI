@@ -16,8 +16,11 @@ router = APIRouter(prefix="/admin", tags=["Admin Portal & Analytics"])
 def get_dashboard_overview(db: Session = Depends(get_db)):
     """
     Fast, real-time database aggregation for the Admin Command Dashboard.
-    Returns ONLY real user-reported inspection data with zero dummy fallbacks.
+    Returns ONLY real user-reported inspection data with dynamic civil budget estimates.
     """
+    from app.services.budget_service import get_budget_service
+    budget_svc = get_budget_service()
+
     inspections = db.query(Inspection).options(
         joinedload(Inspection.detections),
         joinedload(Inspection.severity_assessment),
@@ -32,6 +35,7 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
     high_count = 0
     medium_count = 0
     low_count = 0
+    total_city_budget_inr = 0.0
 
     recent_items = []
 
@@ -63,6 +67,22 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
         else:
             low_count += 1
 
+        # Calculate dynamic repair budget for inspection
+        budget_info = (inc.device_info or {}).get("budget") if isinstance(inc.device_info, dict) else None
+        if not budget_info:
+            calc_area = inc.detections[0].area_sq_m if inc.detections else 0.45
+            det_name = inc.detections[0].class_name if inc.detections else "pothole"
+            budget_info = budget_svc.estimate_defect_budget(
+                asset_type=inc.asset_type.value if hasattr(inc.asset_type, "value") else str(inc.asset_type),
+                defect_class=det_name,
+                surface_area_sq_m=calc_area,
+                severity_level=sev,
+                overall_score=risk_score
+            )
+
+        if st not in ("COMPLETED", "WORK_DONE"):
+            total_city_budget_inr += budget_info.get("total_budget_inr", 0.0)
+
         # Format recent items (top 6)
         if idx < 6:
             media_url = None
@@ -91,6 +111,9 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
                 "address": address,
                 "media_url": media_url,
                 "assigned_engineer": inc.assigned_engineer,
+                "budget": budget_info,
+                "estimated_cost_inr": budget_info.get("total_budget_inr", 0.0),
+                "formatted_cost_inr": budget_info.get("formatted_budget_inr", "₹0.00"),
                 "created_at": (inc.created_at or inc.captured_at).isoformat() if (inc.created_at or inc.captured_at) else None
             })
 
@@ -103,6 +126,8 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
         "high_risk_count": high_count,
         "medium_risk_count": medium_count,
         "low_risk_count": low_count,
+        "total_city_budget_inr": round(total_city_budget_inr, 2),
+        "formatted_city_budget_inr": f"₹{total_city_budget_inr:,.2f}",
         "recent_inspections": recent_items
     })
 

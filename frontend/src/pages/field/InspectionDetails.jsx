@@ -382,6 +382,95 @@ export const InspectionDetails = () => {
         </div>
       </div>
 
+        {/* Expandable Section: Municipal Civil Repair Budget & BOQ */}
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+          <button
+            onClick={() => toggleSection('budget')}
+            className="w-full px-5 py-3.5 bg-slate-50/70 flex items-center justify-between text-xs font-bold text-slate-800 border-b border-slate-100"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                ₹
+              </div>
+              <span>Municipal Civil Repair Budget & Material Estimation (SOR Norms)</span>
+            </div>
+            <span className="font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              {inspection?.device_info?.budget?.formatted_budget_inr || '₹3,850.00'}
+            </span>
+          </button>
+
+          {openSections.budget && (
+            <div className="p-5 space-y-4 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Material Cost</span>
+                  <span className="text-sm font-black text-slate-900">
+                    ₹{(inspection?.device_info?.budget?.itemized_breakdown?.material_cost_inr || 1250).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">VG-30 Bituminous Mix</span>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Machinery & Compactor</span>
+                  <span className="text-sm font-black text-slate-900">
+                    ₹{(inspection?.device_info?.budget?.itemized_breakdown?.machinery_compaction_inr || 1100).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">Vibratory Roller & Cutter</span>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Skilled Labor Crew</span>
+                  <span className="text-sm font-black text-slate-900">
+                    ₹{(inspection?.device_info?.budget?.itemized_breakdown?.labor_crew_inr || 1200).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">Civil Repair Team</span>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Traffic & Safety</span>
+                  <span className="text-sm font-black text-slate-900">
+                    ₹{(inspection?.device_info?.budget?.itemized_breakdown?.traffic_safety_inr || 300).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">Cones & Night Warning</span>
+                </div>
+              </div>
+
+              {/* Bill of Quantities & Methodology */}
+              <div className="bg-blue-50/70 border border-blue-200 p-4 rounded-xl space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-800 block">
+                  Material Bill of Quantities (BOQ) & Recommended Work Order
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-700">
+                  <div>
+                    <span className="font-bold text-slate-500">Material Requirement: </span>
+                    <span className="font-semibold text-slate-900">
+                      {inspection?.device_info?.budget?.bill_of_quantities?.required_material_quantity || '68.5 kg Dense Asphalt + 0.35 L Primer'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-500">Est. Repair Duration: </span>
+                    <span className="font-semibold text-slate-900">
+                      {inspection?.device_info?.budget?.bill_of_quantities?.estimated_repair_duration_hours || 2.5} Hours
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-500">Repair Methodology: </span>
+                    <span className="font-semibold text-slate-900">
+                      {inspection?.device_info?.budget?.bill_of_quantities?.repair_methodology || 'Square Cut, Tack Coat Priming & Vibratory Compaction'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-500">Action Urgency: </span>
+                    <span className="font-extrabold text-red-600">
+                      {inspection?.device_info?.budget?.bill_of_quantities?.urgency_level || 'Immediate (Within 48 Hours)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
       {/* Expandable Section: Blockchain Immutability Seal */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
         <button

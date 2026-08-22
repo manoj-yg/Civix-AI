@@ -92,9 +92,40 @@ async def process_live_stream_frame(
             annotated_media_url = storage.get_download_url(annot_file_path)
             annotated_b64 = "data:image/jpeg;base64," + base64.b64encode(annotated_bytes).decode('utf-8')
 
-            # 3.3 Determine asset type enum
+            # 3.3 Determine asset type enum and compute dynamic repair budget
             norm_type = asset_type.upper()
             infra_enum = getattr(AssetTypeEnum, norm_type) if hasattr(AssetTypeEnum, norm_type) else AssetTypeEnum.ROAD
+
+            from app.services.budget_service import get_budget_service
+            primary_det = detections[0] if len(detections) > 0 else {}
+            calc_area = float(primary_det.get("area_sq_m", 0.45))
+            det_class = str(primary_det.get("class_name", "pothole"))
+
+            # Determine severity level
+            sev_score = 75.0
+            sev_level_enum = SeverityLevelEnum.HIGH
+            if isinstance(severity_assessment, dict):
+                sev_score = float(severity_assessment.get("score", 75.0))
+                lvl_str = str(severity_assessment.get("level", "HIGH")).upper()
+                sev_level_enum = getattr(SeverityLevelEnum, lvl_str) if hasattr(SeverityLevelEnum, lvl_str) else SeverityLevelEnum.HIGH
+            elif isinstance(severity_assessment, (int, float)):
+                sev_score = float(severity_assessment)
+                if sev_score >= 80:
+                    sev_level_enum = SeverityLevelEnum.CRITICAL
+                elif sev_score >= 60:
+                    sev_level_enum = SeverityLevelEnum.HIGH
+                elif sev_score >= 40:
+                    sev_level_enum = SeverityLevelEnum.MEDIUM
+                else:
+                    sev_level_enum = SeverityLevelEnum.LOW
+
+            budget_data = get_budget_service().estimate_defect_budget(
+                asset_type=norm_type,
+                defect_class=det_class,
+                surface_area_sq_m=calc_area,
+                severity_level=sev_level_enum.value if hasattr(sev_level_enum, "value") else str(sev_level_enum),
+                overall_score=sev_score
+            )
 
             # 3.4 Create Inspection (Default: PENDING = Red / Danger on GIS map)
             inspection = Inspection(
@@ -109,7 +140,9 @@ async def process_live_stream_frame(
                     "location_name": area_address,
                     "source": "Live Camera Scanner",
                     "raw_image_url": raw_media_url,
-                    "annotated_image_url": annotated_media_url
+                    "annotated_image_url": annotated_media_url,
+                    "budget": budget_data,
+                    "estimated_cost_inr": budget_data["total_budget_inr"]
                 }
             )
             db.add(inspection)
@@ -134,29 +167,15 @@ async def process_live_stream_frame(
             db.add(media_annotated)
             db.add(media_raw)
 
-            # 3.6 Create Severity Assessment
-            sev_score = 75.0
-            sev_level_enum = SeverityLevelEnum.HIGH
-            if isinstance(severity_assessment, dict):
-                sev_score = float(severity_assessment.get("score", 75.0))
-                lvl_str = str(severity_assessment.get("level", "HIGH")).upper()
-                sev_level_enum = getattr(SeverityLevelEnum, lvl_str) if hasattr(SeverityLevelEnum, lvl_str) else SeverityLevelEnum.HIGH
-            elif isinstance(severity_assessment, (int, float)):
-                sev_score = float(severity_assessment)
-                if sev_score >= 80:
-                    sev_level_enum = SeverityLevelEnum.CRITICAL
-                elif sev_score >= 60:
-                    sev_level_enum = SeverityLevelEnum.HIGH
-                elif sev_score >= 40:
-                    sev_level_enum = SeverityLevelEnum.MEDIUM
-                else:
-                    sev_level_enum = SeverityLevelEnum.LOW
+            # 3.6 Create Severity Assessment with Budget Details
+            sev_details = severity_assessment if isinstance(severity_assessment, dict) else {"score": sev_score}
+            sev_details["budget"] = budget_data
 
             sev_rec = DBSeverity(
                 inspection_id=inspection.id,
                 overall_score=sev_score,
                 severity_level=sev_level_enum,
-                details=severity_assessment if isinstance(severity_assessment, dict) else {"score": sev_score}
+                details=sev_details
             )
             db.add(sev_rec)
 
