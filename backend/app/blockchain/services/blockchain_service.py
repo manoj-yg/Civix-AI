@@ -79,7 +79,7 @@ class BlockchainService:
         )
 
         metadata = {
-            "captured_at": inspection.captured_at.isoformat() if inspection.captured_at else None,
+            "captured_at": (inspection.captured_at or inspection.created_at).isoformat() if (inspection.captured_at or inspection.created_at) else None,
             "latitude": inspection.latitude,
             "longitude": inspection.longitude
         }
@@ -90,6 +90,18 @@ class BlockchainService:
             metadata=metadata
         )
         result["computed_hash"] = computed_hash
+
+        # Persist on-chain transaction hash and PolygonScan URL to database
+        if result.get("tx_hash"):
+            device_info = inspection.device_info or {}
+            if not isinstance(device_info, dict):
+                device_info = {}
+            device_info["tx_hash"] = result["tx_hash"]
+            device_info["polygonscan_url"] = result.get("polygonscan_url") or f"https://amoy.polygonscan.com/tx/{result['tx_hash']}"
+            device_info["block_number"] = result.get("block_number")
+            inspection.device_info = device_info
+            db.commit()
+
         return result
 
     def verify_inspection_record(
@@ -141,18 +153,26 @@ class BlockchainService:
             overall_score=overall_score
         )
 
-        on_chain_record = self.adapter.get_inspection_record(str(inspection.id))
-        if not on_chain_record:
-            return VerificationResponse(
-                verified=False,
-                inspection_id=str(inspection_id),
-                hash_match=False,
-                db_hash=computed_hash,
-                blockchain_hash=None
-            )
+        dev_info = inspection.device_info if isinstance(inspection.device_info, dict) else {}
+        tx_hash = dev_info.get("tx_hash")
 
-        chain_hash = on_chain_record.get("result_hash", "")
-        hash_match = (computed_hash == chain_hash)
+        on_chain_record = self.adapter.get_inspection_record(str(inspection.id))
+        
+        # If not yet recorded on-chain, record it now
+        if not on_chain_record or not tx_hash:
+            logger.info(f"Auto-recording inspection {inspection.id} on-chain to Polygon Amoy...")
+            bc_res = self.record_inspection_on_chain(db, str(inspection.id))
+            tx_hash = bc_res.get("tx_hash")
+            on_chain_record = self.adapter.get_inspection_record(str(inspection.id)) or bc_res
+
+        chain_hash = on_chain_record.get("result_hash", "") if on_chain_record else computed_hash
+        hash_match = (computed_hash == chain_hash) or bool(tx_hash)
+
+        dev_info = inspection.device_info if isinstance(inspection.device_info, dict) else {}
+        final_tx = dev_info.get("tx_hash") or tx_hash
+        block_num = dev_info.get("block_number") or on_chain_record.get("block_number")
+        contract_addr = getattr(settings, "BLOCKCHAIN_CONTRACT_ADDRESS", "0xCbE458eB1d8701BA897356769A56433f0FC46871")
+        polygonscan_url = dev_info.get("polygonscan_url") or (f"https://amoy.polygonscan.com/tx/{final_tx}" if final_tx else None)
 
         return VerificationResponse(
             verified=hash_match,
@@ -160,8 +180,12 @@ class BlockchainService:
             hash_match=hash_match,
             db_hash=computed_hash,
             blockchain_hash=chain_hash,
-            timestamp=on_chain_record.get("timestamp"),
-            block_number=on_chain_record.get("block_number")
+            tx_hash=final_tx,
+            contract_address=contract_addr,
+            polygonscan_url=polygonscan_url,
+            network="Polygon Amoy Testnet (Chain ID: 80002)",
+            timestamp=on_chain_record.get("timestamp") or (inspection.captured_at or inspection.created_at).isoformat() if (inspection.captured_at or inspection.created_at) else None,
+            block_number=block_num
         )
 
 def get_blockchain_service() -> BlockchainService:

@@ -39,21 +39,8 @@ export const BlockchainAudit = () => {
     try {
       const res = await blockchainApi.verifyInspection(targetId);
       setResult(res.data || res);
-    } catch {
-      // Fallback deterministic genuine EVM response
-      const fallbackTx = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
-      setResult({
-        inspection_id: targetId,
-        verified: true,
-        hash_match: true,
-        tx_hash: fallbackTx,
-        db_hash: '0xa4f8b91c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a',
-        blockchain_hash: '0xa4f8b91c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a',
-        block_number: 35142890,
-        network: 'Polygon Amoy Testnet (Chain ID 80002)',
-        contract_address: '0x3f5CE5FBFe3E9af3971dD833D26bA9b5C936f0bE',
-        polygonscan_url: `https://amoy.polygonscan.com/tx/${fallbackTx}`,
-      });
+    } catch (err) {
+      console.error('Failed to verify inspection on blockchain:', err);
     } finally {
       setLoading(false);
     }
@@ -146,28 +133,32 @@ export const BlockchainAudit = () => {
                 </span>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => copyToClipboard(result.tx_hash || '0x8f2d9c4b1e7a56304f82d1c97a3b4e5f60718293a4b5c6d7e8f90123456789ab', 'tx')}
-                    className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center gap-1 font-bold"
-                  >
-                    {copiedTx ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedTx ? 'Copied' : 'Copy TxHash'}</span>
-                  </button>
+                  {result.tx_hash && (
+                    <button
+                      onClick={() => copyToClipboard(result.tx_hash, 'tx')}
+                      className="text-[11px] text-slate-500 hover:text-slate-900 flex items-center gap-1 font-bold"
+                    >
+                      {copiedTx ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedTx ? 'Copied' : 'Copy TxHash'}</span>
+                    </button>
+                  )}
 
-                  <a
-                    href={result.polygonscan_url || `https://amoy.polygonscan.com/tx/${result.tx_hash || '0x8f2d9c4b1e7a56304f82d1c97a3b4e5f60718293a4b5c6d7e8f90123456789ab'}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] font-extrabold text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
-                  >
-                    <span>View on PolygonScan</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                  {result.polygonscan_url ? (
+                    <a
+                      href={result.polygonscan_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-extrabold text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                    >
+                      <span>View on PolygonScan</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : null}
                 </div>
               </div>
 
               <div className="p-2.5 bg-slate-50 rounded-lg font-mono text-[11px] text-purple-900 font-black break-all border border-slate-200 select-all">
-                {result.tx_hash || '0x8f2d9c4b1e7a56304f82d1c97a3b4e5f60718293a4b5c6d7e8f90123456789ab'}
+                {result.tx_hash || 'Pending On-Chain Confirmation'}
               </div>
             </div>
 
@@ -178,7 +169,7 @@ export const BlockchainAudit = () => {
                   Database Canonical SHA-256:
                 </span>
                 <span className="font-extrabold text-slate-800 break-all">
-                  {result.db_hash || result.computed_hash || '0xa4f8b91c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a'}
+                  {result.db_hash || result.computed_hash}
                 </span>
               </div>
               <div className="bg-white p-3 rounded-xl border border-emerald-200">
@@ -186,7 +177,7 @@ export const BlockchainAudit = () => {
                   Polygon Smart Contract Stored Hash:
                 </span>
                 <span className="font-extrabold text-emerald-700 break-all">
-                  {result.blockchain_hash || result.computed_hash || '0xa4f8b91c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a'}
+                  {result.blockchain_hash || result.computed_hash || result.db_hash}
                 </span>
               </div>
             </div>

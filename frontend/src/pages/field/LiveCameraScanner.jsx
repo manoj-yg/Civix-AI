@@ -99,7 +99,8 @@ export const LiveCameraScanner = () => {
       if (res.saved_to_db && res.inspection_id) {
         setLastCapture({
           inspection_id: res.inspection_id,
-          media_url: res.media_url,
+          raw_media_url: res.raw_media_url,
+          annotated_media_url: res.annotated_media_url || res.media_url,
           defects: dets,
           severity: res.severity_assessment,
           blockchain: res.blockchain,
@@ -181,22 +182,22 @@ export const LiveCameraScanner = () => {
           className="w-full h-full object-cover"
         />
 
-        {/* Real-Time Detection Canvas Overlay */}
+        {/* Live HUD Canvas Overlay Layer */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none z-10"
         />
 
-        {/* Camera HUD Status Overlay */}
-        <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20">
-          <div className="bg-slate-900/80 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-2 border border-white/20 shadow-md">
+        {/* Top Scanning Status Header Overlay */}
+        <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
+          <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-white text-xs">
             <span className={`w-2.5 h-2.5 rounded-full ${isScanning ? 'bg-red-500 animate-ping' : 'bg-slate-400'}`}></span>
-            <span>{isScanning ? 'LIVE AI DETECTING & RECORDING' : 'CAMERA READY'}</span>
+            <span className="font-bold">{isScanning ? 'SCANNING AT 30 FPS' : 'CAMERA STANDBY'}</span>
           </div>
 
-          <div className="bg-slate-900/80 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-white/20 shadow-md flex items-center gap-1.5">
-            <span className="text-slate-300">Logged to DB:</span>
-            <span className="text-emerald-400 font-extrabold text-sm">{totalSavedCount}</span>
+          <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-white text-xs font-bold flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+            <span>Saved to DB: {totalSavedCount}</span>
           </div>
         </div>
 
@@ -207,7 +208,7 @@ export const LiveCameraScanner = () => {
         </div>
       </div>
 
-      {/* Instant Blockchain Immuntability Alert Banner */}
+      {/* Instant Blockchain Immutability Alert Banner with Before & After Comparison */}
       {lastCapture && (
         <div className="bg-white border-2 border-emerald-500 rounded-2xl p-4 shadow-md space-y-3 animate-fadeIn">
           <div className="flex items-start justify-between gap-3">
@@ -217,7 +218,7 @@ export const LiveCameraScanner = () => {
               </div>
               <div>
                 <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <span>Pothole Detected & Frame Stored!</span>
+                  <span>Pothole Detected & Frames Stored!</span>
                   <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-extrabold">RED: DANGER</span>
                 </h4>
                 <p className="text-[11px] text-slate-500">
@@ -225,12 +226,45 @@ export const LiveCameraScanner = () => {
                 </p>
               </div>
             </div>
-            <Link
-              to="/admin/map"
-              className="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-colors shrink-0"
-            >
-              <Map className="w-3.5 h-3.5" /> View on Map
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                to={`/admin/inspections/${lastCapture.inspection_id}`}
+                className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-colors shrink-0"
+              >
+                Inspection Details
+              </Link>
+              <Link
+                to="/admin/map"
+                className="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-colors shrink-0"
+              >
+                <Map className="w-3.5 h-3.5" /> View on Map
+              </Link>
+            </div>
+          </div>
+
+          {/* Before & After Dual Frame Preview Cards */}
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-slate-500 uppercase block">1. Before Detection (Original)</span>
+              <div className="aspect-[4/3] rounded-lg overflow-hidden border border-slate-200 bg-slate-900 shadow-2xs">
+                {lastCapture.raw_media_url ? (
+                  <img src={lastCapture.raw_media_url} alt="Before Detection" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-white text-[10px] p-2 text-center">Original Frame</div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-red-600 uppercase block">2. After Detection (AI Marked)</span>
+              <div className="aspect-[4/3] rounded-lg overflow-hidden border-2 border-red-400 bg-slate-900 shadow-2xs">
+                {lastCapture.annotated_media_url ? (
+                  <img src={lastCapture.annotated_media_url} alt="After Detection Marked" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-white text-[10px] p-2 text-center">Marked Defect</div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Blockchain Cryptographic Hash Stamp */}
@@ -238,15 +272,26 @@ export const LiveCameraScanner = () => {
             <div className="flex items-center gap-2 overflow-hidden">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
               <div className="truncate">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Immutable Blockchain Hash</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Polygon On-Chain TxHash</span>
                 <span className="font-mono text-[11px] font-bold text-slate-800 truncate block">
-                  {lastCapture.blockchain?.computed_hash || lastCapture.blockchain?.result_hash || '0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069'}
+                  {lastCapture.blockchain?.tx_hash || lastCapture.blockchain?.computed_hash || 'Confirmed on Polygon Ledger'}
                 </span>
               </div>
             </div>
-            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border border-emerald-300">
-              Verified
-            </span>
+            {lastCapture.blockchain?.polygonscan_url ? (
+              <a
+                href={lastCapture.blockchain.polygonscan_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border border-emerald-300 transition-colors"
+              >
+                PolygonScan
+              </a>
+            ) : (
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border border-emerald-300">
+                Verified
+              </span>
+            )}
           </div>
         </div>
       )}

@@ -110,6 +110,37 @@ def process_ai_inspection_job(inspection_id: str, image_bytes: bytes, db: Sessio
             }
         })
 
+        # Save Annotated Image (After Detection) to permanent storage & media table
+        import cv2
+        import time as pytime
+        from app.services.storage_service import LocalStorageService
+        from app.models.models import Media as DBMedia
+
+        storage = LocalStorageService()
+        bgr_annot = cv2.cvtColor(annotated_np, cv2.COLOR_RGB2BGR) if len(annotated_np.shape) == 3 else annotated_np
+        is_succ, annot_buf = cv2.imencode('.jpg', bgr_annot)
+        if is_succ:
+            annot_bytes = annot_buf.tobytes()
+            annot_path, annot_type, annot_sz = storage.upload_file(
+                annot_bytes,
+                f"annotated_upload_{int(pytime.time() * 1000)}.jpg",
+                "image/jpeg"
+            )
+            annot_media = DBMedia(
+                inspection_id=inspection.id,
+                file_path=annot_path,
+                file_type="annotated_image",
+                mime_type="image/jpeg;role=annotated",
+                file_size=annot_sz
+            )
+            db.add(annot_media)
+
+            dev_info = inspection.device_info or {}
+            if not isinstance(dev_info, dict):
+                dev_info = {}
+            dev_info["annotated_image_url"] = storage.get_download_url(annot_path)
+            inspection.device_info = dev_info
+
         # 4. Record SHA-256 Canonical Hash on Blockchain
         bc_record = bc_service.record_inspection_on_chain(db, str(inspection.id))
         logger.info(f"Recorded Blockchain Audit Hash for {inspection.id} | Hash: {bc_record.get('computed_hash')[:10]}...")

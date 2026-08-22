@@ -60,27 +60,43 @@ async def process_live_stream_frame(
 
         # 3. If defect(s) detected, persist frame, database records, and blockchain immutability seal
         if len(detections) > 0:
+            import cv2
             from app.services.storage_service import LocalStorageService
             from app.blockchain.services.blockchain_service import get_blockchain_service
             from app.models.models import Media as DBMedia, SeverityAssessment as DBSeverity
+            from app.services.geo_utils import reverse_geocode_address
 
-            # 3.1 Save image frame to permanent storage
             storage = LocalStorageService()
-            file_path, file_type, file_size = storage.upload_file(
+            ts = int(np.datetime64('now', 'ms').astype('int64'))
+            area_address = reverse_geocode_address(latitude, longitude)
+
+            # 3.1 Save Original Raw Image (Before Detection)
+            raw_file_path, raw_type, raw_size = storage.upload_file(
                 raw_bytes,
-                f"camera_detection_{int(np.datetime64('now', 'ms').astype('int64'))}.jpg",
+                f"raw_frame_{ts}.jpg",
                 "image/jpeg"
             )
-            media_url = storage.get_download_url(file_path)
+            raw_media_url = storage.get_download_url(raw_file_path)
 
-            # 3.2 Determine asset type enum and resolved street address
+            # 3.2 Generate and Save Annotated Marked Image (After Detection)
+            annotated_np = ai_service.pipeline.postprocessor.annotate_image(img_np, detections, location_text=area_address)
+            bgr_annotated = cv2.cvtColor(annotated_np, cv2.COLOR_RGB2BGR) if len(annotated_np.shape) == 3 else annotated_np
+            is_success, buffer = cv2.imencode('.jpg', bgr_annotated)
+            annotated_bytes = buffer.tobytes() if is_success else raw_bytes
+
+            annot_file_path, annot_type, annot_size = storage.upload_file(
+                annotated_bytes,
+                f"annotated_frame_{ts}.jpg",
+                "image/jpeg"
+            )
+            annotated_media_url = storage.get_download_url(annot_file_path)
+            annotated_b64 = "data:image/jpeg;base64," + base64.b64encode(annotated_bytes).decode('utf-8')
+
+            # 3.3 Determine asset type enum
             norm_type = asset_type.upper()
             infra_enum = getattr(AssetTypeEnum, norm_type) if hasattr(AssetTypeEnum, norm_type) else AssetTypeEnum.ROAD
 
-            from app.services.geo_utils import reverse_geocode_address
-            area_address = reverse_geocode_address(latitude, longitude)
-
-            # 3.3 Create Inspection (Default: PENDING = Red / Danger on GIS map)
+            # 3.4 Create Inspection (Default: PENDING = Red / Danger on GIS map)
             inspection = Inspection(
                 asset_type=infra_enum,
                 latitude=latitude,
@@ -88,23 +104,37 @@ async def process_live_stream_frame(
                 status=InspectionStatusEnum.PENDING,
                 ai_status=InspectionStatusEnum.COMPLETED,
                 work_notes=area_address,
-                device_info={"address": area_address, "location_name": area_address, "source": "Live Camera Scanner"}
+                device_info={
+                    "address": area_address,
+                    "location_name": area_address,
+                    "source": "Live Camera Scanner",
+                    "raw_image_url": raw_media_url,
+                    "annotated_image_url": annotated_media_url
+                }
             )
             db.add(inspection)
             db.flush()
             db_inspection_id = str(inspection.id)
 
-            # 3.4 Create Media link
-            media_rec = DBMedia(
+            # 3.5 Create Media records for BOTH Before (Raw) & After (Annotated)
+            media_annotated = DBMedia(
                 inspection_id=inspection.id,
-                file_path=file_path,
-                file_type=file_type,
-                mime_type="image/jpeg",
-                file_size=file_size
+                file_path=annot_file_path,
+                file_type="annotated_image",
+                mime_type="image/jpeg;role=annotated",
+                file_size=annot_size
             )
-            db.add(media_rec)
+            media_raw = DBMedia(
+                inspection_id=inspection.id,
+                file_path=raw_file_path,
+                file_type="raw_image",
+                mime_type="image/jpeg;role=raw",
+                file_size=raw_size
+            )
+            db.add(media_annotated)
+            db.add(media_raw)
 
-            # 3.5 Create Severity Assessment
+            # 3.6 Create Severity Assessment
             sev_score = 75.0
             sev_level_enum = SeverityLevelEnum.HIGH
             if isinstance(severity_assessment, dict):
@@ -130,7 +160,7 @@ async def process_live_stream_frame(
             )
             db.add(sev_rec)
 
-            # 3.6 Create Detection records
+            # 3.7 Create Detection records
             for d in detections:
                 det = Detection(
                     inspection_id=inspection.id,
@@ -144,16 +174,17 @@ async def process_live_stream_frame(
             db.commit()
             saved_to_db = True
 
-            # 3.7 Log immutably to Blockchain
+            # 3.8 Log immutably to Polygon Blockchain
             try:
                 blockchain_svc = get_blockchain_service()
                 blockchain_receipt = blockchain_svc.record_inspection_on_chain(db, db_inspection_id)
             except Exception as bc_err:
                 blockchain_receipt = {
-                    "status": "logged_local",
-                    "error": str(bc_err),
-                    "computed_hash": f"0x{int(np.datetime64('now', 'ms').astype('int64')):x}7a8b9c0d1e2f"
+                    "status": "error",
+                    "error": str(bc_err)
                 }
+
+            media_url = annotated_media_url
 
         return {
             "status": "success",
@@ -163,7 +194,10 @@ async def process_live_stream_frame(
             "severity_assessment": severity_assessment,
             "saved_to_db": saved_to_db,
             "inspection_id": db_inspection_id,
+            "raw_media_url": raw_media_url if len(detections) > 0 else None,
+            "annotated_media_url": annotated_media_url if len(detections) > 0 else None,
             "media_url": media_url,
+            "annotated_frame_base64": annotated_b64 if len(detections) > 0 else None,
             "blockchain": blockchain_receipt
         }
 

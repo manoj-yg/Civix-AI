@@ -15,6 +15,10 @@ class VerificationResponse(BaseModel):
     hash_match: bool
     db_hash: str
     blockchain_hash: Optional[str] = None
+    tx_hash: Optional[str] = None
+    contract_address: Optional[str] = None
+    polygonscan_url: Optional[str] = None
+    network: Optional[str] = "Polygon Amoy Testnet (Chain ID: 80002)"
     timestamp: Optional[str] = None
     block_number: Optional[int] = None
 
