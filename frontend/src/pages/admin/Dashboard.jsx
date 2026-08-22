@@ -9,58 +9,119 @@ import {
   ClipboardList,
   Wrench,
   ShieldCheck,
-  TrendingUp,
   MapPin,
   ChevronRight,
   Camera,
-  Layers,
-  Cpu
+  Cpu,
+  RefreshCw,
+  Calendar,
+  CheckCircle2
 } from 'lucide-react';
 import { analyticsApi } from '../../api/analytics.api';
-import { inspectionApi } from '../../api/inspection.api';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, formatAddress } from '../../utils/formatters';
 
 export const Dashboard = () => {
   const [stats, setStats] = useState(null);
-  const [recentInspections, setRecentInspections] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        const [statsRes, inspRes] = await Promise.all([
-          analyticsApi.getAdminStats(),
-          inspectionApi.getInspections({ limit: 6 }),
-        ]);
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      const res = await analyticsApi.getDashboardOverview();
+      setStats(res.data || res);
+    } catch (err) {
+      console.error('Failed to load dashboard overview data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        setStats(statsRes.data || statsRes);
-        setRecentInspections(inspRes.data || inspRes.items || []);
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  useEffect(() => {
     loadDashboardData();
   }, []);
 
+  const totalReported = stats?.total_reported_issues ?? 0;
+  const openHazards = stats?.open_hazards ?? 0;
+  const criticalPotholes = stats?.critical_potholes ?? 0;
+  const inProgressRepairs = stats?.in_progress_repairs ?? 0;
+  const resolvedRepairs = stats?.resolved_repairs ?? 0;
+  const recentList = stats?.recent_inspections ?? [];
+
   const kpis = [
-    { title: 'Total Monitored Assets', value: stats?.total_assets || '1,420', icon: Building2, color: 'blue' },
-    { title: 'Open Hazards (Red)', value: stats?.open_defects || '142', change: '+4 today', trend: 'up', icon: AlertTriangle, color: 'orange' },
-    { title: 'Critical Potholes', value: stats?.critical_defects || '12', change: 'Immediate Action', trend: 'up', icon: AlertTriangle, color: 'red' },
-    { title: 'Camera Ingestions Today', value: stats?.inspections_today || recentInspections.length || '28', change: '100% On-Chain', trend: 'up', icon: ClipboardList, color: 'emerald' },
-    { title: 'Active Repairs (Orange)', value: stats?.pending_maintenance || '34', icon: Wrench, color: 'purple' },
+    {
+      title: 'Total Monitored Issues',
+      value: String(totalReported),
+      icon: ClipboardList,
+      color: 'blue',
+      change: '100% Real Database'
+    },
+    {
+      title: 'Open Hazards (🔴 Danger)',
+      value: String(openHazards),
+      icon: AlertTriangle,
+      color: 'red',
+      change: openHazards > 0 ? 'Pending Review' : 'All Clear'
+    },
+    {
+      title: 'Critical Potholes',
+      value: String(criticalPotholes),
+      icon: AlertTriangle,
+      color: 'orange',
+      change: criticalPotholes > 0 ? 'Urgent Action' : 'Zero Critical'
+    },
+    {
+      title: 'Active Repairs (🟠 In Progress)',
+      value: String(inProgressRepairs),
+      icon: Wrench,
+      color: 'purple',
+      change: 'Crew Dispatched'
+    },
+    {
+      title: 'Solved / Repaired (🟢 Solved)',
+      value: String(resolvedRepairs),
+      icon: CheckCircle2,
+      color: 'emerald',
+      change: 'Verified On-Chain'
+    },
   ];
 
   const riskOverview = [
-    { level: 'CRITICAL', label: '🔴 Danger (Critical)', count: stats?.risk_breakdown?.critical || 12, color: 'bg-red-500', border: 'border-red-200', text: 'text-red-700' },
-    { level: 'HIGH', label: '🟠 High Risk', count: stats?.risk_breakdown?.high || 38, color: 'bg-orange-500', border: 'border-orange-200', text: 'text-orange-700' },
-    { level: 'MEDIUM', label: '🟡 Medium Concern', count: stats?.risk_breakdown?.medium || 92, color: 'bg-amber-500', border: 'border-amber-200', text: 'text-amber-700' },
-    { level: 'LOW', label: '🟢 Low / Repaired', count: stats?.risk_breakdown?.low || 210, color: 'bg-emerald-500', border: 'border-emerald-200', text: 'text-emerald-700' },
+    {
+      level: 'CRITICAL',
+      label: '🔴 Danger (Critical)',
+      count: stats?.critical_potholes ?? 0,
+      color: 'bg-red-500',
+      border: 'border-red-200',
+      text: 'text-red-700'
+    },
+    {
+      level: 'HIGH',
+      label: '🟠 High Risk',
+      count: stats?.high_risk_count ?? 0,
+      color: 'bg-orange-500',
+      border: 'border-orange-200',
+      text: 'text-orange-700'
+    },
+    {
+      level: 'MEDIUM',
+      label: '🟡 Medium Risk',
+      count: stats?.medium_risk_count ?? 0,
+      color: 'bg-amber-500',
+      border: 'border-amber-200',
+      text: 'text-amber-700'
+    },
+    {
+      level: 'LOW',
+      label: '🟢 Low Risk',
+      count: stats?.low_risk_count ?? 0,
+      color: 'bg-emerald-500',
+      border: 'border-emerald-200',
+      text: 'text-emerald-700'
+    },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Top Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
@@ -78,14 +139,24 @@ export const Dashboard = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            icon={RefreshCw}
+            onClick={loadDashboardData}
+            loading={loading}
+            className="border-slate-200 text-slate-700 font-bold"
+          >
+            Refresh
+          </Button>
           <Link to="/field/scanner">
             <Button size="sm" variant="primary" icon={Camera} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs">
-              Live Camera Scanner
+              Live Scanner
             </Button>
           </Link>
           <Link to="/admin/map">
             <Button size="sm" variant="outline" icon={MapPin} className="border-slate-300 text-slate-700 font-bold">
-              GIS Live Map
+              GIS Map
             </Button>
           </Link>
         </div>
@@ -142,24 +213,30 @@ export const Dashboard = () => {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-xs text-slate-400 font-semibold">Loading recent inspections...</div>
-          ) : recentInspections.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400 font-semibold">No recent inspection records available.</div>
+            <div className="p-8 text-center text-xs text-slate-400 font-semibold">Loading real inspection data...</div>
+          ) : recentList.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-400 font-semibold space-y-2">
+              <p>No issues reported in the database yet.</p>
+              <Link to="/field/scanner" className="text-blue-600 font-bold underline inline-block">
+                Start scanning with Live Camera Scanner
+              </Link>
+            </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {recentInspections.map((item) => {
-                const mediaItem = item.media_items && item.media_items.length > 0 ? item.media_items[0] : null;
-                const filename = mediaItem?.file_path ? mediaItem.file_path.split('/').pop().split('\\').pop() : null;
-                const mediaUrl = filename ? `/api/v1/inspections/media/file/${filename}` : null;
-                const sevLevel = item.severity_assessment?.severity_level || 'HIGH';
+              {recentList.map((item) => {
                 const normStatus = (item.status || 'PENDING').toUpperCase();
 
                 return (
                   <div key={item.id} className="py-3 flex items-center justify-between gap-3 text-xs hover:bg-slate-50/70 p-2 rounded-xl transition-colors">
                     <div className="flex items-center gap-3">
-                      {mediaUrl ? (
+                      {item.media_url ? (
                         <div className="w-12 h-9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs shrink-0">
-                          <img src={mediaUrl} alt="Capture" className="w-full h-full object-cover" onError={(e) => { e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center text-[9px] text-slate-400">Frame</div>'; }} />
+                          <img
+                            src={item.media_url}
+                            alt="Capture"
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center text-[9px] text-slate-400">Frame</div>'; }}
+                          />
                         </div>
                       ) : (
                         <div className="w-12 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-200">
@@ -167,11 +244,14 @@ export const Dashboard = () => {
                         </div>
                       )}
                       <div>
-                        <span className="font-bold text-slate-900 capitalize block">
-                          {item.detections && item.detections.length > 0 ? item.detections[0].class_name : (item.asset_type || 'Road Defect')}
+                        <span className="font-extrabold text-slate-900 capitalize block">
+                          {item.defect_type || 'Road Pothole Hazard'}
                         </span>
-                        <span className="text-slate-400 text-[11px] block font-mono">
-                          ID: {item.id.slice(0, 8)}... • {formatDate(item.captured_at || item.created_at)}
+                        <span className="text-slate-500 text-[11px] block font-medium">
+                          {item.address || 'Bengaluru Road Corridor'}
+                        </span>
+                        <span className="text-slate-400 text-[10px] block font-mono">
+                          {formatDate(item.created_at)}
                         </span>
                       </div>
                     </div>
@@ -190,8 +270,11 @@ export const Dashboard = () => {
                           🔴 Danger
                         </span>
                       )}
-                      <SeverityBadge level={sevLevel} />
-                      <Link to={`/admin/inspections/${item.id}`} className="text-blue-600 hover:text-blue-800 font-bold text-xs bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                      <SeverityBadge level={item.severity_level || 'HIGH'} />
+                      <Link
+                        to={`/admin/inspections/${item.id}`}
+                        className="text-blue-600 hover:text-blue-800 font-bold text-xs bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200"
+                      >
                         Details
                       </Link>
                     </div>

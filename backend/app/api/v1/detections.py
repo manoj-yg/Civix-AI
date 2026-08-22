@@ -73,9 +73,12 @@ async def process_live_stream_frame(
             )
             media_url = storage.get_download_url(file_path)
 
-            # 3.2 Determine asset type enum
+            # 3.2 Determine asset type enum and resolved street address
             norm_type = asset_type.upper()
             infra_enum = getattr(AssetTypeEnum, norm_type) if hasattr(AssetTypeEnum, norm_type) else AssetTypeEnum.ROAD
+
+            from app.services.geo_utils import reverse_geocode_address
+            area_address = reverse_geocode_address(latitude, longitude)
 
             # 3.3 Create Inspection (Default: PENDING = Red / Danger on GIS map)
             inspection = Inspection(
@@ -84,7 +87,8 @@ async def process_live_stream_frame(
                 longitude=longitude,
                 status=InspectionStatusEnum.PENDING,
                 ai_status=InspectionStatusEnum.COMPLETED,
-                work_notes=f"Auto-detected by Realtime Camera Scanner at ({latitude:.5f}, {longitude:.5f})"
+                work_notes=area_address,
+                device_info={"address": area_address, "location_name": area_address, "source": "Live Camera Scanner"}
             )
             db.add(inspection)
             db.flush()

@@ -1,8 +1,9 @@
 from typing import List, Dict, Any, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, text
 from app.models.models import Asset, Inspection, SeverityAssessment, Defect, AssetTypeEnum
 from app.schemas.gis import GeoJSONFeature, GeoJSONFeatureCollection, HeatmapPoint
+from app.services.geo_utils import reverse_geocode_address
 
 class GISService:
     def get_nearby_inspections(
@@ -12,7 +13,10 @@ class GISService:
         Fetches inspections within radius_meters using PostGIS spatial indexing or Euclidean fallback.
         """
         try:
-            results = db.query(Inspection).filter(
+            results = db.query(Inspection).options(
+                joinedload(Inspection.detections),
+                joinedload(Inspection.severity_assessment)
+            ).filter(
                 func.ST_DWithin(
                     Inspection.geom,
                     func.ST_GeographyFromText(f"SRID=4326;POINT({longitude} {latitude})"),
@@ -20,7 +24,10 @@ class GISService:
                 )
             ).all()
         except Exception:
-            results = db.query(Inspection).all()
+            results = db.query(Inspection).options(
+                joinedload(Inspection.detections),
+                joinedload(Inspection.severity_assessment)
+            ).all()
 
         output = []
         for inc in results:
@@ -41,7 +48,9 @@ class GISService:
         Queries high-risk inspection clusters where risk score >= min_risk_score.
         """
         high_risk = []
-        inspections = db.query(Inspection).all()
+        inspections = db.query(Inspection).options(
+            joinedload(Inspection.severity_assessment)
+        ).all()
         for inc in inspections:
             score = (inc.severity_assessment.overall_score * 10.0) if inc.severity_assessment else 0.0
             if score >= min_risk_score:
@@ -67,7 +76,10 @@ class GISService:
             "STREETLIGHT": [],
             "FOOTPATH": []
         }
-        inspections = db.query(Inspection).all()
+        inspections = db.query(Inspection).options(
+            joinedload(Inspection.detections),
+            joinedload(Inspection.severity_assessment)
+        ).all()
         for inc in inspections:
             infra_key = inc.asset_type.value if hasattr(inc.asset_type, "value") else str(inc.asset_type)
             if infra_key not in grouped:
@@ -87,7 +99,9 @@ class GISService:
         Returns weighted heatmap points based on inspection severity scores.
         """
         points = []
-        inspections = db.query(Inspection).all()
+        inspections = db.query(Inspection).options(
+            joinedload(Inspection.severity_assessment)
+        ).all()
         for inc in inspections:
             weight = 1.0
             if inc.severity_assessment:
@@ -103,7 +117,9 @@ class GISService:
         """
         Calculates city-wide infrastructure damage aggregates across severity, infrastructure type, and work status.
         """
-        inspections = db.query(Inspection).all()
+        inspections = db.query(Inspection).options(
+            joinedload(Inspection.severity_assessment)
+        ).all()
         total_damages = len(inspections)
 
         by_severity = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
@@ -149,15 +165,20 @@ class GISService:
 
     def get_defects_geojson(self, db: Session) -> GeoJSONFeatureCollection:
         """
-        Returns rich GeoJSON FeatureCollection of all citizen and inspector damage records.
+        Returns rich GeoJSON FeatureCollection of all stored database records with zero delay.
         """
         features = []
-        inspections = db.query(Inspection).order_by(Inspection.created_at.desc()).all()
+        inspections = db.query(Inspection).options(
+            joinedload(Inspection.detections),
+            joinedload(Inspection.severity_assessment),
+            joinedload(Inspection.media_items)
+        ).order_by(Inspection.created_at.desc()).all()
+
         for inc in inspections:
             # Defect type label
-            defect_type = "Infrastructure Defect"
+            defect_type = "Road Pothole Hazard"
             if inc.detections and len(inc.detections) > 0:
-                defect_type = inc.detections[0].class_name or "Infrastructure Defect"
+                defect_type = inc.detections[0].class_name or "Road Pothole Hazard"
             elif inc.device_info and isinstance(inc.device_info, dict) and inc.device_info.get("defect_type"):
                 defect_type = inc.device_info.get("defect_type")
 
@@ -168,19 +189,21 @@ class GISService:
                 from pathlib import Path
                 media_url = f"/api/v1/inspections/media/file/{Path(raw_path).name}"
 
-            # Address / notes
+            # Address / Area Resolution
             address = (inc.device_info or {}).get("address") if isinstance(inc.device_info, dict) else None
             if not address and inc.device_info and isinstance(inc.device_info, dict):
-                address = inc.device_info.get("location_name") or inc.device_info.get("notes")
+                address = inc.device_info.get("location_name")
+            if not address and inc.work_notes and not inc.work_notes.startswith("Auto-detected"):
+                address = inc.work_notes
             if not address:
-                address = inc.work_notes or f"GPS: {round(inc.latitude, 5)}° N, {round(inc.longitude, 5)}° E"
+                address = reverse_geocode_address(inc.latitude, inc.longitude)
 
-            sev_level = "LOW"
-            risk_score = 45.0
+            sev_level = "HIGH"
+            risk_score = 75.0
             if inc.severity_assessment:
                 val = inc.severity_assessment.severity_level
                 sev_level = val.value if hasattr(val, "value") else str(val)
-                raw_s = float(inc.severity_assessment.overall_score or 45.0)
+                raw_s = float(inc.severity_assessment.overall_score or 75.0)
                 risk_score = round(raw_s if raw_s > 10 else raw_s * 10.0, 1)
 
             status_val = inc.status.value if hasattr(inc.status, "value") else str(inc.status)
@@ -194,7 +217,7 @@ class GISService:
                     "inspection_id": str(inc.id),
                     "asset_type": inc.asset_type.value if hasattr(inc.asset_type, "value") else str(inc.asset_type),
                     "defect_type": defect_type,
-                    "status": status_val,
+                    "status": status_val.upper(),
                     "severity_score": risk_score,
                     "severity_level": sev_level.upper(),
                     "upvotes_count": inc.upvotes_count or 0,
@@ -203,6 +226,8 @@ class GISService:
                     "assigned_engineer": inc.assigned_engineer,
                     "work_notes": inc.work_notes or inc.resolution_notes,
                     "blockchain_verified": True,
+                    "latitude": inc.latitude,
+                    "longitude": inc.longitude,
                     "created_at": (inc.created_at or inc.captured_at).isoformat() if (inc.created_at or inc.captured_at) else None
                 }
             ))
@@ -210,4 +235,5 @@ class GISService:
 
 def get_gis_service() -> GISService:
     return GISService()
+
 

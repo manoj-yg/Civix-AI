@@ -1,6 +1,10 @@
 import apiClient from './axios';
 
 export const analyticsApi = {
+  getDashboardOverview: async () => {
+    return await apiClient.get('/admin/dashboard-overview');
+  },
+
   getAdminStats: async () => {
     return await apiClient.get('/admin/stats');
   },

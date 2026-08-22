@@ -12,27 +12,44 @@ class Base(DeclarativeBase):
 
 db_url = settings.get_database_url()
 
+_cached_engine = None
+
 def init_engine():
-    if "postgresql" in db_url:
-        try:
-            eng = create_engine(
-                db_url,
-                pool_pre_ping=True,
-                pool_size=5,
-                max_overflow=10,
-                connect_args={"connect_timeout": 2}
-            )
-            with eng.connect() as conn:
-                pass
-            logger.info("Successfully connected to PostgreSQL PostGIS database.")
-            return eng
-        except Exception as e:
-            logger.warning(f"PostgreSQL unavailable at {db_url}: {e}. Using SQLite fallback database for local execution.")
+    global _cached_engine
+    if _cached_engine is not None:
+        return _cached_engine
 
     db_dir = settings.ROOT_DIR if hasattr(settings, "ROOT_DIR") else Path(__file__).resolve().parent.parent.parent.parent
     local_db_path = Path(db_dir) / "temp" / "civix_ai.db"
     local_db_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Check for direct local SQLite usage
+    if getattr(settings, "USE_SQLITE", False) or "sqlite" in db_url:
+        _cached_engine = create_sqlite_engine(local_db_path)
+        return _cached_engine
+
+    if "postgresql" in db_url:
+        try:
+            eng = create_engine(
+                db_url,
+                pool_pre_ping=True,
+                pool_size=10,
+                max_overflow=20,
+                pool_recycle=300,
+                connect_args={"connect_timeout": 6}
+            )
+            with eng.connect() as conn:
+                pass
+            logger.info("Successfully connected to Neon Cloud PostgreSQL database.")
+            _cached_engine = eng
+            return _cached_engine
+        except Exception as e:
+            logger.info(f"Neon Cloud connection timed out or offline ({e}). Using local SQLite fallback database.")
+
+    _cached_engine = create_sqlite_engine(local_db_path)
+    return _cached_engine
+
+def create_sqlite_engine(local_db_path):
     eng = create_engine(
         f"sqlite:///{local_db_path}",
         connect_args={"check_same_thread": False},

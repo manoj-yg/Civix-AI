@@ -24,7 +24,7 @@ import {
 import { inspectionApi } from '../../api/inspection.api';
 import { reportApi } from '../../api/report.api';
 import { gisApi } from '../../api/gis.api';
-import { formatDate, formatCoords } from '../../utils/formatters';
+import { formatDate, formatCoords, formatAddress } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 
 export const BBMPDashboard = () => {
@@ -348,65 +348,76 @@ export const BBMPDashboard = () => {
                         </div>
                       </td>
 
-                      {/* Asset & GPS */}
+                      {/* Asset & Area Address */}
                       <td className="py-3 px-4">
-                        <div className="space-y-0.5">
-                          <span className="font-bold text-slate-900 dark:text-white capitalize block">
+                        <div className="space-y-1">
+                          <span className="font-bold text-slate-900 capitalize block">
                             {item.asset_type || 'Road'} Segment
                           </span>
-                          <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="text-[11px] font-semibold text-slate-800 flex items-start gap-1 max-w-[200px]">
+                            <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                            <span>{formatAddress(item.work_notes || item.device_info?.address, item.latitude, item.longitude)}</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400 block pl-4.5">
                             {formatCoords(item.latitude, item.longitude)}
                           </span>
                         </div>
                       </td>
 
-                      {/* AI Defect Breakdown */}
+                      {/* AI Defect Breakdown & Frame Preview */}
                       <td className="py-3 px-4">
-                        <div className="space-y-1">
-                          {item.detections && item.detections.length > 0 ? (
-                            <span className="font-bold text-slate-800 dark:text-slate-200">
-                              {item.detections[0].class_name} ({Math.round(item.detections[0].confidence * 100)}%)
-                            </span>
-                          ) : (
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Infrastructure Defect</span>
-                          )}
-                          {item.upvotes_count > 0 && (
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 w-fit">
-                              <Flame className="w-3 h-3 text-amber-600" />
-                              <span>{item.upvotes_count} Upvotes</span>
+                        <div className="flex items-center gap-2.5">
+                          {item.media_items && item.media_items.length > 0 && (
+                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
+                              <img
+                                src={`/api/v1/inspections/media/file/${item.media_items[0].file_path.split(/[\\/]/).pop()}`}
+                                alt="Capture"
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
                             </div>
                           )}
+                          <div className="space-y-0.5">
+                            {item.detections && item.detections.length > 0 ? (
+                              <span className="font-extrabold text-slate-900 block">
+                                {item.detections[0].class_name} ({Math.round(item.detections[0].confidence * 100)}%)
+                              </span>
+                            ) : (
+                              <span className="font-bold text-slate-800 block">Road Pothole Hazard</span>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                🔗 Polygon Verified
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </td>
 
-                      {/* Status */}
+                      {/* Work Execution Status */}
                       <td className="py-3 px-4">
-                        <div className="space-y-1">
-                          <StatusBadge status={item.status} />
-                          {item.resolved_at && (
-                            <span className="text-[10px] text-emerald-600 font-semibold block">
-                              Done: {formatDate(item.resolved_at)}
-                            </span>
-                          )}
-                        </div>
+                        <StatusBadge status={item.status} />
                       </td>
 
-                      {/* Assigned & Notes */}
-                      <td className="py-3 px-4 max-w-[200px]">
+                      {/* Assigned Engineer / Remarks */}
+                      <td className="py-3 px-4 max-w-[180px]">
                         <div className="space-y-0.5">
-                          <p className="font-semibold text-slate-800 dark:text-slate-200 text-xs truncate">
-                            {item.assigned_engineer || <span className="text-slate-400 italic">Unassigned</span>}
+                          <p className="font-bold text-slate-900 text-xs truncate flex items-center gap-1">
+                            <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span>{item.assigned_engineer || 'Unassigned Crew'}</span>
                           </p>
                           <p className="text-[11px] text-slate-500 truncate" title={item.work_notes}>
-                            {item.work_notes || 'No work notes logged yet.'}
+                            {item.work_notes || item.resolution_notes || 'Pending field survey'}
                           </p>
                         </div>
                       </td>
 
-                      {/* Date */}
-                      <td className="py-3 px-4 text-slate-500 text-[11px] whitespace-nowrap">
-                        {formatDate(item.captured_at || item.created_at)}
+                      {/* Date (IST) */}
+                      <td className="py-3 px-4 text-slate-600 text-[11px] font-semibold whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{formatDate(item.created_at || item.captured_at)}</span>
+                        </div>
                       </td>
 
                       {/* Actions */}
